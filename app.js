@@ -37,3 +37,18 @@ async function meetNow(){if(!pendingInvitePersonId)return;const me=await ensure(
 async function seedDemoProfiles(){if(!sb||!state.communityId){alert('Supabase is not connected yet.');return}status('Creating demo profiles...');const rows=DEMO_PROFILES.map((p,i)=>({community_id:state.communityId,user_key:`demo-hlc-${i+1}`,name:p.name,title:p.title,bio:p.bio,photo_url:'',offers:p.offers,needs:p.needs,current_focus:p.current_focus,braindate_offer:p.braindate_offer,ideal_match:'',meeting_style:i%2===0?'30-minute role-play':'Accountability check-in',availability:'Demo availability',openness:'Open to anyone in the community',updated_at:new Date().toISOString()}));const {error}=await sb.from('profiles').upsert(rows,{onConflict:'community_id,user_key'});if(error){console.error(error);status('Demo seed error','error');alert('Could not create demo profiles.');return}await loadPeople();renderAll();status('Demo profiles created','ok');alert('Demo profiles created. You can now test Spark Match recommendations.')}
 function initMeetingAndDemoControls(){$('closeMeetingModal')?.addEventListener('click',closeMeetingModal);$('sendScheduledInvite')?.addEventListener('click',sendScheduledInvite);$('meetNowBtn')?.addEventListener('click',meetNow);$('meetingModal')?.addEventListener('click',e=>{if(e.target.id==='meetingModal')closeMeetingModal()});$('seedDemoProfiles')?.addEventListener('click',seedDemoProfiles);if(new URLSearchParams(location.search).get('demo')==='true')document.querySelectorAll('.demo-only').forEach(el=>el.classList.remove('hidden'))}
 initMeetingAndDemoControls();init();
+
+
+function initDemoVisibilityV23(){
+  const isDemo = new URLSearchParams(location.search).get('demo') === 'true';
+  if(isDemo){
+    document.querySelectorAll('.demo-only').forEach(el => el.classList.remove('hidden'));
+  }
+  document.getElementById('seedDemoProfiles')?.addEventListener('click', seedDemoProfiles);
+  document.getElementById('seedDemoProfilesTop')?.addEventListener('click', seedDemoProfiles);
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initDemoVisibilityV23);
+}else{
+  initDemoVisibilityV23();
+}

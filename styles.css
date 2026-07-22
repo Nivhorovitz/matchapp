@@ -39,3 +39,30 @@
 .time-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
 .demo-only{border-color:rgba(196,155,82,.45)!important}
 @media (max-width:720px){.time-grid{grid-template-columns:1fr}.meeting-location{flex-direction:column}}
+
+
+.top-demo{
+  border:1px solid rgba(196,155,82,.35);
+  background:var(--burgundy);
+  color:white;
+  border-radius:999px;
+  padding:10px 14px;
+  font-weight:900;
+  margin-right:10px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(111,36,49,.18);
+}
+.top-demo.hidden{display:none!important}
+.demo-only.hidden{display:none!important}
+.versionchip,.version-chip{
+  display:inline-flex;
+  align-items:center;
+  margin-right:8px;
+  border:1px solid rgba(111,36,49,.12);
+  background:rgba(255,250,244,.75);
+  border-radius:999px;
+  padding:8px 10px;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
+}

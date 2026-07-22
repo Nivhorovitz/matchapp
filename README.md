@@ -32,3 +32,13 @@ Visible checks:
 - A small `v2.2` chip appears near the connection status.
 - Open with `?demo=true` to show `Create demo profiles`.
 - Match cards open a scheduling modal with meeting place: `Inside this room · Spark Match table`.
+
+## v2.3
+
+Fixes:
+- Demo button now appears in the top bar when URL includes `?demo=true`.
+- Version marker now reads `v2.3`.
+- Scheduling modal is still opened from match cards after `Show my matches`, not from the question screen.
+
+Test URL:
+`https://nivhorovitz.github.io/matchapp/?demo=true`
