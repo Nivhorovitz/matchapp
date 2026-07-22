@@ -25,3 +25,10 @@ Recommended room URL:
 
 Demo/testing URL:
 `https://nivhorovitz.github.io/matchapp/?v=spatial21&demo=true`
+
+## v2.2 fixed demo + meetings
+
+Visible checks:
+- A small `v2.2` chip appears near the connection status.
+- Open with `?demo=true` to show `Create demo profiles`.
+- Match cards open a scheduling modal with meeting place: `Inside this room · Spark Match table`.
