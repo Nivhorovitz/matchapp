@@ -13,7 +13,45 @@ function hydrate(){if($('quickName')){$('quickName').value=state.me.name||'';$('
 function split(s){return(s||'').split(/,|\n/).map(x=>x.trim()).filter(Boolean)}function uniq(a){return[...new Set((a||[]).filter(Boolean))]}
 function collectQuick(){state.me.name=$('quickName').value.trim();state.me.title=$('quickTitle').value.trim();state.me.current_focus=$('quickGoal').value.trim();state.me.bio=state.me.current_focus||state.me.bio;state.me.needs=uniq([state.currentTypeLabel,...state.selectedTags,...split($('quickNeed').value)]);state.me.offers=uniq(split($('quickOffer').value));state.me.braindate_offer=state.me.offers.join(', ');state.me.meeting_style=state.currentType==='practice'?'30-minute role-play':state.currentType==='accountability'?'Accountability check-in':state.currentType==='mentor'?'Deep-dive coaching conversation':''}
 function collectFull(){if(!$('profileName'))return;const has=$('profileName').value||$('profileTitle').value||$('profileBio').value||$('profileGoal').value||$('profileOffer').value||$('profileNeed').value;if(!has)return;state.me.name=$('profileName').value.trim();state.me.title=$('profileTitle').value.trim();state.me.bio=$('profileBio').value.trim();state.me.current_focus=$('profileGoal').value.trim();state.me.offers=split($('profileOffer').value);state.me.needs=split($('profileNeed').value);state.me.email=$('profileEmail').value.trim();state.me.phone=$('profilePhone').value.trim()}
-async function saveProfile(){if(!sb||!state.communityId){status('Connection error','error');return null}collectFull();status('Saving...');const payload={community_id:state.communityId,user_key:state.userKey,name:state.me.name||'Guest',title:state.me.title||'',bio:state.me.bio||state.me.current_focus||'',photo_url:state.me.photo_url||'',offers:state.me.offers||[],needs:state.me.needs||[],current_focus:state.me.current_focus||'',braindate_offer:state.me.braindate_offer||'',ideal_match:state.me.ideal_match||'',meeting_style:state.me.meeting_style||'',availability:state.me.availability||'',openness:state.me.openness||'',email:state.me.email||'',phone:state.me.phone||'',updated_at:new Date().toISOString()};const {data,error}=await sb.from('profiles').upsert(payload,{onConflict:'community_id,user_key'}).select().single();if(error){console.error(error);status('Save error','error');alert('Save failed. Check Supabase schema.');return null}Object.assign(state.me,prof(data));state.myProfileId=data.id;await loadPeople();await loadSaved();status('Saved','ok');return state.me}
+async function saveProfile(){
+  if(!sb||!state.communityId){status('Connection error','error');return null}
+  collectFull();
+  status('Saving...');
+  const minimal={
+    community_id:state.communityId,
+    user_key:state.userKey,
+    name:state.me.name||'Guest',
+    title:state.me.title||'',
+    bio:state.me.bio||state.me.current_focus||'',
+    offers:state.me.offers||[],
+    needs:state.me.needs||[],
+    current_focus:state.me.current_focus||'',
+    braindate_offer:state.me.braindate_offer||'',
+    updated_at:new Date().toISOString()
+  };
+  let res = await sb.from('profiles').upsert(minimal,{onConflict:'community_id,user_key'}).select('*').single();
+  if(res.error){
+    console.warn('Minimal upsert failed, trying select/update fallback',res.error);
+    const found = await sb.from('profiles').select('id').eq('community_id',state.communityId).eq('user_key',state.userKey).limit(1).maybeSingle();
+    if(found.data && found.data.id){
+      res = await sb.from('profiles').update(minimal).eq('id',found.data.id).select('*').single();
+    }else{
+      res = await sb.from('profiles').insert(minimal).select('*').single();
+    }
+  }
+  if(res.error){
+    console.error('Save profile failed:',res.error);
+    status('Save error','error');
+    alert('Save failed: '+(res.error.message||'Supabase schema error'));
+    return null;
+  }
+  Object.assign(state.me,prof(res.data));
+  state.myProfileId=res.data.id;
+  await loadPeople();
+  await loadSaved();
+  status('Saved','ok');
+  return state.me;
+}
 function score(p){const need=(state.me.needs||[]).join(' ').toLowerCase(),goal=(state.me.current_focus||'').toLowerCase();let s=10;const c=[p.offers.join(' '),p.needs.join(' '),p.current_focus,p.bio,p.braindate_offer].join(' ').toLowerCase();(state.me.needs||[]).forEach(n=>{if(c.includes(String(n).toLowerCase()))s+=18});(p.offers||[]).forEach(o=>{o=String(o).toLowerCase();if(need.includes(o)||goal.includes(o.split(' ')[0]))s+=14});if(state.currentType==='practice'&&c.includes('practice'))s+=18;if(state.currentType==='practice'&&c.includes('role'))s+=12;if(state.currentType==='accountability'&&c.includes('accountability'))s+=22;if(state.currentType==='mentor'&&(c.includes('mentor')||c.includes('coach')||c.includes('founder')))s+=18;if(p.photo_url)s+=4;if(p.current_focus)s+=5;return Math.min(99,s)}
 function rec(n=3){return[...state.people].map(p=>({...p,score:score(p)})).sort((a,b)=>b.score-a.score).slice(0,n)}function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}function initls(n){return(n||'SM').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()}function first(n){return(n||'').trim().split(/\s+/)[0]}
 function why(p){const o=(p.offers||[]).slice(0,2).join(', ');if(state.currentType==='practice')return`${p.name||'This member'} may be useful for focused role-play and feedback, especially around ${o||'sales practice'}.`;if(state.currentType==='accountability')return`${p.name||'This member'} can help create momentum and follow-through around your current sales goal.`;if(state.currentType==='mentor')return`${p.name||'This member'} may help you see the next move with more clarity and confidence.`;return`${p.name||'This member'} has signals that connect to what you need now.`}
@@ -32,8 +70,43 @@ const DEMO_PROFILES=[{"name": "Maya", "title": "Business coach for women entrepr
 function openMeetingModal(id){pendingInvitePersonId=id;const p=state.people.find(x=>x.id===id);const n=typeof first==='function'?first(p?.name):((p?.name||'').split(/\s+/)[0]);if($('meetingPersonName'))$('meetingPersonName').textContent=p?`Invite ${n} to connect`:'Invite to connect';$('meetingModal')?.classList.remove('hidden')}
 function closeMeetingModal(){pendingInvitePersonId=null;$('meetingModal')?.classList.add('hidden')}
 function mtimes(){return [$('meetingTime1')?.value,$('meetingTime2')?.value,$('meetingTime3')?.value].map(x=>(x||'').trim()).filter(Boolean).join(' | ')}
-async function sendScheduledInvite(){if(!pendingInvitePersonId)return;const me=await ensure();if(!me)return;const p=state.people.find(x=>x.id===pendingInvitePersonId);const times=mtimes();const msg=($('meetingMessage')?.value||'').trim()||'Would you like to meet for a focused sales practice conversation?';const full=`${msg}\n\nMeeting place: Inside this room · Spark Match table${times?'\nSuggested times: '+times:''}`;const {error}=await sb.from('invites').insert({community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:`${first(state.me.name)||'Someone'} invited you to a Spark Match`,message:full,proposed_times:times,status:'sent'});if(error){console.error(error);alert('Could not create invite.');return}status('Invite sent','ok');alert(`Invite created for ${first(p?.name)||'this member'}. Meet inside this room at the Spark Match table.`);closeMeetingModal()}
-async function meetNow(){if(!pendingInvitePersonId)return;const me=await ensure();if(!me)return;const p=state.people.find(x=>x.id===pendingInvitePersonId);const {error}=await sb.from('invites').insert({community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:'Meet now at the Spark Match table',message:'I am in the room now. Want to meet at the Spark Match table for a focused sales practice conversation?',proposed_times:'Now · Spark Match table',status:'sent'});if(error){console.error(error);alert('Could not create invite.');return}status('Meet now invite sent','ok');alert(`Meet now invite created for ${first(p?.name)||'this member'}. Go to the Spark Match table in this room.`);closeMeetingModal()}
+async function sendScheduledInvite(){
+  if(!pendingInvitePersonId)return;
+  const me=await ensure();
+  if(!me||!state.myProfileId){alert('Could not save your profile before creating the invite.');return}
+  const p=state.people.find(x=>x.id===pendingInvitePersonId);
+  const times=mtimes();
+  const msg=($('meetingMessage') && $('meetingMessage').value ? $('meetingMessage').value : '').trim()||'Would you like to meet for a focused sales practice conversation?';
+  const full=`${msg}\n\nMeeting place: Inside this room · Spark Match table${times?'\nSuggested times: '+times:''}`;
+  let payload={community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:`${first(state.me.name)||'Someone'} invited you to a Spark Match`,message:full,proposed_times:times,status:'sent'};
+  let res=await sb.from('invites').insert(payload);
+  if(res.error){
+    console.warn('Full invite insert failed, trying minimal invite',res.error);
+    payload={community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:`${first(state.me.name)||'Someone'} invited you to a Spark Match`,message:full,status:'sent'};
+    res=await sb.from('invites').insert(payload);
+  }
+  if(res.error){console.error('Invite failed:',res.error);alert('Could not create invite: '+(res.error.message||'Supabase schema error'));return}
+  status('Invite sent','ok');
+  alert(`Invite created for ${first(p&&p.name)||'this member'}. Meet inside this room at the Spark Match table.`);
+  closeMeetingModal();
+}
+async function meetNow(){
+  if(!pendingInvitePersonId)return;
+  const me=await ensure();
+  if(!me||!state.myProfileId){alert('Could not save your profile before creating the invite.');return}
+  const p=state.people.find(x=>x.id===pendingInvitePersonId);
+  let payload={community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:'Meet now at the Spark Match table',message:'I am in the room now. Want to meet at the Spark Match table for a focused sales practice conversation?',proposed_times:'Now · Spark Match table',status:'sent'};
+  let res=await sb.from('invites').insert(payload);
+  if(res.error){
+    console.warn('Full meet-now insert failed, trying minimal invite',res.error);
+    payload={community_id:state.communityId,sender_profile_id:state.myProfileId,receiver_profile_id:pendingInvitePersonId,title:'Meet now at the Spark Match table',message:'I am in the room now. Want to meet at the Spark Match table for a focused sales practice conversation?',status:'sent'};
+    res=await sb.from('invites').insert(payload);
+  }
+  if(res.error){console.error('Meet now failed:',res.error);alert('Could not create invite: '+(res.error.message||'Supabase schema error'));return}
+  status('Meet now invite sent','ok');
+  alert(`Meet now invite created for ${first(p&&p.name)||'this member'}. Go to the Spark Match table in this room.`);
+  closeMeetingModal();
+}
 async function seedDemoProfiles(){if(!sb||!state.communityId){alert('Supabase is not connected yet.');return}status('Creating demo profiles...');const rows=DEMO_PROFILES.map((p,i)=>({community_id:state.communityId,user_key:`demo-hlc-${i+1}`,name:p.name,title:p.title,bio:p.bio,photo_url:'',offers:p.offers,needs:p.needs,current_focus:p.current_focus,braindate_offer:p.braindate_offer,ideal_match:'',meeting_style:i%2===0?'30-minute role-play':'Accountability check-in',availability:'Demo availability',openness:'Open to anyone in the community',updated_at:new Date().toISOString()}));const {error}=await sb.from('profiles').upsert(rows,{onConflict:'community_id,user_key'});if(error){console.error(error);status('Demo seed error','error');alert('Could not create demo profiles.');return}await loadPeople();renderAll();status('Demo profiles created','ok');alert('Demo profiles created. You can now test Spark Match recommendations.')}
 function initMeetingAndDemoControls(){$('closeMeetingModal')?.addEventListener('click',closeMeetingModal);$('sendScheduledInvite')?.addEventListener('click',sendScheduledInvite);$('meetNowBtn')?.addEventListener('click',meetNow);$('meetingModal')?.addEventListener('click',e=>{if(e.target.id==='meetingModal')closeMeetingModal()});$('seedDemoProfiles')?.addEventListener('click',seedDemoProfiles);if(new URLSearchParams(location.search).get('demo')==='true')document.querySelectorAll('.demo-only').forEach(el=>el.classList.remove('hidden'))}
 initMeetingAndDemoControls();init();

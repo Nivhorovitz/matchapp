@@ -42,3 +42,10 @@ Fixes:
 
 Test URL:
 `https://nivhorovitz.github.io/matchapp/?demo=true`
+
+
+## v2.4 robust save
+- Profile save uses only safe schema fields.
+- If upsert fails, it falls back to select/update/insert.
+- Invite creation retries with a minimal payload if the full invite insert fails.
+- Visible version marker: v2.4.
